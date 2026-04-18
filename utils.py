@@ -20,8 +20,8 @@ def load_documents_from_files(uploaded_files) -> List:
     all_docs = []
 
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=700,   # 🔥 bigger = better context
-        chunk_overlap=80,
+        chunk_size=800,   # better context
+        chunk_overlap=100,
         separators=["\n\n", "\n", " ", ""]
     )
 
