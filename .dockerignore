@@ -1,0 +1,17 @@
+venv/
+__pycache__/
+*.pyc
+
+.git/
+.gitignore
+.dockerignore
+
+faiss_index/
+models/
+data/
+
+.env
+.DS_Store
+
+.streamlit/
+*.log
