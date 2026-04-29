@@ -1,7 +1,8 @@
 import os
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+os.environ["HF_DATASETS_OFFLINE"] = "1"
 INDEX_PATH = "./faiss_index"
 
 # ---------------- Embeddings (CACHED) ----------------
