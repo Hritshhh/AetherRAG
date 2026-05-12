@@ -27,7 +27,7 @@ def get_b64(path):
             return base64.b64encode(f.read()).decode()
     return None
 
-LOGO     = get_b64("logo.png")
+LOGO     = get_b64("assets/logo.png")
 LOGO_SRC = f"data:image/png;base64,{LOGO}" if LOGO else ""
 AVATAR   = (
     f'<img class="ai-avatar" src="{LOGO_SRC}">'
@@ -375,7 +375,7 @@ components.html("""
 # SIDEBAR 
 with st.sidebar:
     if LOGO:
-        st.image("logo.png", width=54)
+        st.image("assets/logo.png", width=54)
     st.markdown("### Aether")
     st.caption("Local · Private · Offline")
     st.divider()
