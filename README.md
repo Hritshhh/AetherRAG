@@ -14,7 +14,7 @@
 
 ---
 
-# 📖 About AetherRAG
+# About AetherRAG
 
 AetherRAG is a fully local AI assistant that allows users to upload documents and interact with them conversationally using Retrieval-Augmented Generation (RAG).
 
@@ -22,14 +22,14 @@ The system is specifically designed to minimize hallucinations by grounding resp
 
 Unlike cloud-based AI systems, Aether runs entirely on the user's machine:
 
-- 🔒 No external API calls
-- 📡 Offline capable
-- 🧠 Local LLM inference
-- 📄 Local document indexing
-- 🔐 Private semantic retrieval
-- 📄 Source-backed answers with highlighted retrieval chunks
-- 🧠 Hallucination-resistant RAG pipeline
-- ✅ Explainable responses grounded in uploaded documents
+- No external API calls
+- Offline capable
+- Local LLM inference
+- Local document indexing
+- Private semantic retrieval
+- Source-backed answers with highlighted retrieval chunks
+- Hallucination-resistant RAG pipeline
+- Explainable responses grounded in uploaded documents
 
 The assistant combines:
 
@@ -42,29 +42,29 @@ The assistant combines:
 
 ---
 
-# ✨ Features
+# Features
 
-- 🔒 Fully local & private AI assistant
-- 📄 PDF / TXT / DOCX / CSV / JSON / Markdown ingestion
-- 🧠 Semantic search using dense vector embeddings
-- ⚡ Fast FAISS vector retrieval
-- 🤖 Mistral 7B inference via Ollama
-- 🐳 Dockerized deployment
-- 💬 Chat-style Streamlit interface
-- 📊 Confidence scoring with hallucination filtering
-- 📄 Source chunk highlighting with quoted evidence
-- 🧠 Retrieval-grounded generation
-- 📡 Offline-first architecture
-- ♻️ Incremental FAISS indexing
-- 🧵 Streaming token generation
-- 🧠 Context-aware greetings & acknowledgements
-- ✅ Explainable AI responses with traceable context
-- 🔍 Confidence-aware semantic retrieval
-- 🚫 Weak-context rejection to reduce hallucinations
+- Fully local & private AI assistant
+- PDF / TXT / DOCX / CSV / JSON / Markdown ingestion
+- Semantic search using dense vector embeddings
+- Fast FAISS vector retrieval
+- Mistral 7B inference via Ollama
+- Dockerized deployment
+- Chat-style Streamlit interface
+- Confidence scoring with hallucination filtering
+- Source chunk highlighting with quoted evidence
+- Retrieval-grounded generation
+- Offline-first architecture
+- Incremental FAISS indexing
+- Streaming token generation
+- Context-aware greetings & acknowledgements
+- Explainable AI responses with traceable context
+- Confidence-aware semantic retrieval
+- Weak-context rejection to reduce hallucinations
 
 ---
 
-# 🧠 Tech Stack
+# Tech Stack
 
 | Layer | Technology |
 | --- | --- |
@@ -78,7 +78,7 @@ The assistant combines:
 
 ---
 
-# 🏗️ System Workflow
+# System Workflow
 
 <p align="center">
   <img src="assets/system_workflow.png" width="850"/>
@@ -100,7 +100,7 @@ This enables:
 
 ---
 
-# 🐳 Docker Architecture
+# Docker Architecture
 
 <p align="center">
   <img src="assets/docker_architecture.png" width="900"/>
@@ -130,7 +130,7 @@ This allows the entire RAG pipeline to run locally with minimal setup while main
 
 ---
 
-# 🔒 Offline & Private RAG Pipeline
+# Offline & Private RAG Pipeline
 
 <p align="center">
   <img src="assets/offline_architecture.png" width="500"/>
@@ -156,7 +156,7 @@ All uploaded files remain on the user's machine and are processed entirely local
 
 ---
 
-# ⚙️ Confidence Scoring & Hallucination Filtering
+# Confidence Scoring & Hallucination Filtering
 
 AetherRAG computes semantic relevance using FAISS similarity search.
 
@@ -181,7 +181,7 @@ The confidence system acts as a retrieval-validation layer before final answer g
 
 ---
 
-# 📄 Source Highlighting & Explainability
+# Source Highlighting & Explainability
 
 AetherRAG provides transparent, explainable responses by displaying:
 
@@ -204,7 +204,7 @@ The highlighted retrieval chunks act as quoted contextual proof for generated re
 
 ---
 
-# 📂 Supported Documents
+# Supported Documents
 
 Currently supported:
 
@@ -237,7 +237,7 @@ cd AetherRAG
 
 ---
 
-# ▶️ Method 1 — Run Normally (Streamlit)
+# Method 1 — Run Normally (Streamlit)
 
 ## Install Requirements
 
@@ -271,7 +271,7 @@ streamlit run app.py
 
 ---
 
-# 🐳 Method 2 — Run Using Docker
+# Method 2 — Run Using Docker
 
 ## Start Docker Desktop
 
@@ -374,13 +374,13 @@ This project is intended for academic and educational purposes.
 
 ---
 
-# 👨‍💻 Author
+# Author
 
 ### Hritaansh Mehra  
 GitHub: [Hritshhh](https://github.com/Hritshhh)
 
 ---
 
-# ⭐ AetherRAG
+# AetherRAG
 
 > Private. Offline. Local. Yours.
