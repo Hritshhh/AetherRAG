@@ -1,710 +1,316 @@
 <p align="center">
-
-&#x20; <img src="assets/logo.png" width="140"/>
-
+  <img src="assets/logo.png" width="140"/>
 </p>
-
-
 
 <h1 align="center">AetherRAG</h1>
 
-
-
 <p align="center">
-
-&#x20; <b>Aether — Your Local, Private \& Offline AI Assistant</b>
-
+  <b>Aether — Your Local, Private & Offline AI Assistant</b>
 </p>
 
-
-
 <p align="center">
-
-&#x20; Retrieval-Augmented Generation (RAG) powered by FAISS, LangChain, Ollama and Mistral 7B.
-
+  Retrieval-Augmented Generation (RAG) powered by FAISS, LangChain, Ollama and Mistral 7B.
 </p>
 
+---
 
+## 👨‍💻 Author
 
-\---
+### Hritaansh Mehra  
+GitHub: [Hritshhh](https://github.com/Hritshhh)
 
+---
 
-
-\# 🌌 About AetherRAG
-
-
+# 📖 About AetherRAG
 
 AetherRAG is a fully local AI assistant that allows users to upload documents and interact with them conversationally using Retrieval-Augmented Generation (RAG).
 
-
-
 Unlike cloud-based AI systems, Aether runs entirely on the user's machine:
 
-\- 🔒 No external API calls
-
-\- 📡 Offline capable
-
-\- 🧠 Local LLM inference
-
-\- 📄 Local document indexing
-
-\- 🔐 Private semantic retrieval
-
-
+- 🔒 No external API calls
+- 📡 Offline capable
+- 🧠 Local LLM inference
+- 📄 Local document indexing
+- 🔐 Private semantic retrieval
 
 The assistant combines:
 
-\- \*\*Mistral 7B\*\* for language generation
+- **Mistral 7B** for language generation
+- **FAISS** for vector similarity search
+- **BAAI embeddings** for semantic understanding
+- **LangChain** for orchestration
+- **Ollama** for local LLM serving
+- **Streamlit** for the interactive UI
 
-\- \*\*FAISS\*\* for vector similarity search
+---
 
-\- \*\*BAAI embeddings\*\* for semantic understanding
+# ✨ Features
 
-\- \*\*LangChain\*\* for orchestration
+- 🔒 Fully local & private AI assistant
+- 📄 PDF / TXT document ingestion
+- 🧠 Semantic search using vector embeddings
+- ⚡ Fast FAISS vector retrieval
+- 🤖 Mistral 7B inference via Ollama
+- 🐳 Dockerized deployment
+- 💬 Chat-style Streamlit interface
+- 📊 Confidence scoring & source highlighting
+- 📡 Offline-first architecture
+- ♻️ Incremental FAISS indexing
+- 🧵 Streaming token generation
+- 🧠 Context-aware greetings & acknowledgements
 
-\- \*\*Ollama\*\* for local LLM serving
+---
 
-\- \*\*Streamlit\*\* for the interactive UI
-
-
-
-\---
-
-
-
-\# ✨ Features
-
-
-
-\- 🔒 Fully local \& private AI assistant
-
-\- 📄 PDF / TXT document ingestion
-
-\- 🧠 Semantic search using vector embeddings
-
-\- ⚡ Fast FAISS vector retrieval
-
-\- 🤖 Mistral 7B inference via Ollama
-
-\- 🐳 Dockerized deployment
-
-\- 💬 Chat-style Streamlit interface
-
-\- 📊 Confidence scoring \& source highlighting
-
-\- 📡 Offline-first architecture
-
-\- ♻️ Incremental FAISS indexing
-
-\- 🧵 Streaming token generation
-
-
-
-\---
-
-
-
-\# 🧠 Tech Stack
-
-
+# 🧠 Tech Stack
 
 | Layer | Technology |
-
-|---|---|
-
+| --- | --- |
 | Frontend | Streamlit |
-
 | Application Logic | Python + LangChain |
-
 | Embedding Model | BAAI/bge-small-en-v1.5 |
-
 | Vector Database | FAISS |
-
 | LLM Runtime | Ollama |
-
 | Language Model | Mistral 7B Instruct |
-
 | Containerization | Docker + Docker Compose |
 
+---
 
-
-\---
-
-
-
-\# 🏗️ System Workflow
-
-
+# 🏗️ System Workflow
 
 <p align="center">
-
-&#x20; <img src="assets/system\_workflow.png" width="850"/>
-
+  <img src="assets/system_workflow.png" width="850"/>
 </p>
 
+The workflow begins with document upload and user queries through the Streamlit interface. Documents are embedded locally using BAAI embeddings and stored inside a FAISS vector database. Queries are embedded similarly and semantically matched against stored chunks before context is sent to the local Mistral 7B model through Ollama.
 
+---
 
-\### Workflow Overview
-
-
-
-1\. User uploads documents or asks a query
-
-2\. Documents are chunked and converted into embeddings
-
-3\. FAISS stores semantic vectors locally
-
-4\. User query is embedded
-
-5\. Top-K relevant chunks are retrieved
-
-6\. Retrieved context is passed into Mistral 7B
-
-7\. Aether streams a grounded response with sources \& confidence scoring
-
-
-
-\---
-
-
-
-\# 🐳 Docker Architecture
-
-
+# 🐳 Docker Architecture
 
 <p align="center">
-
-&#x20; <img src="assets/docker\_architecture.png" width="950"/>
-
+  <img src="assets/docker_architecture.png" width="900"/>
 </p>
 
+Docker isolates all dependencies and services into reproducible containers. This solves:
 
+- ✅ Dependency conflicts
+- ✅ Environment inconsistencies
+- ✅ OS compatibility issues
+- ✅ Easier deployment
+- ✅ Portable local AI setup
+- ✅ Faster reproducible setup for other users
 
-\## Why Docker?
+The architecture separates:
 
+- Streamlit application container
+- Ollama inference container
+- Persistent FAISS vector storage
+- Internal Docker networking
 
+---
 
-Docker solves several major deployment problems:
-
-
-
-\### ✅ Dependency Isolation
-
-Avoids Python package conflicts across machines.
-
-
-
-\### ✅ Cross-Platform Consistency
-
-Runs identically on Windows, Linux and macOS.
-
-
-
-\### ✅ Faster Setup
-
-No manual environment configuration required.
-
-
-
-\### ✅ Service Separation
-
-\- Streamlit app runs independently
-
-\- Ollama model server runs independently
-
-
-
-\### ✅ Persistent Model Storage
-
-GGUF models remain cached inside Docker volumes.
-
-
-
-\### ✅ Clean Deployment
-
-Anyone can clone and launch the project with minimal setup.
-
-
-
-\---
-
-
-
-\# 🔒 Local \& Offline Architecture
-
-
+# 🔒 Offline & Private RAG Pipeline
 
 <p align="center">
-
-&#x20; <img src="assets/offline\_architecture.png" width="500"/>
-
+  <img src="assets/offline_pipeline.png" width="500"/>
 </p>
 
+AetherRAG is designed with an offline-first philosophy:
 
+- No cloud APIs
+- No external data transfer
+- All embeddings generated locally
+- All retrieval performed locally
+- All inference performed locally
 
-\## Privacy Advantages
+This makes the system highly suitable for:
 
+- Academic usage
+- Sensitive documents
+- Research workflows
+- Air-gapped environments
+- Privacy-focused AI applications
 
+---
 
-\- ❌ No cloud APIs
+# ⚙️ Confidence Scoring
 
-\- ❌ No OpenAI dependency
+AetherRAG computes semantic relevance using FAISS similarity search.
 
-\- ❌ No external document transfer
+The UI displays confidence badges based on retrieval strength:
 
-\- ✅ Local embeddings
+| Confidence Range | Badge |
+| --- | --- |
+| High relevance | 🟢 High Confidence |
+| Moderate relevance | 🟡 Medium Confidence |
+| Weak relevance | 🔴 Low Confidence |
 
-\- ✅ Local vector search
+The scoring is derived from semantic similarity between:
 
-\- ✅ Local LLM inference
+- User query embeddings
+- Retrieved document chunk embeddings
 
-\- ✅ User-controlled data
+This helps users understand retrieval reliability during inference.
 
+---
 
+# 📂 Supported Documents
 
-All uploaded documents remain entirely on the local machine.
+Currently supported:
 
+- PDF (`.pdf`)
+- Text (`.txt`)
 
+Documents are:
 
-\---
+1. Loaded locally
+2. Chunked into semantic segments
+3. Embedded using BAAI embeddings
+4. Stored inside FAISS index
+5. Retrieved during querying
 
+---
 
+# 🚀 Running the Project
 
-\# ⚙️ How Retrieval Works
-
-
-
-\## 1. Document Ingestion
-
-
-
-Uploaded documents are:
-
-\- parsed
-
-\- chunked
-
-\- embedded using BGE embeddings
-
-
-
-\---
-
-
-
-\## 2. Vector Storage
-
-
-
-Embeddings are stored locally inside:
-
-
+## 1️⃣ Clone Repository
 
 ```bash
-
-faiss\_index/
-
-```
-
-
-
-using FAISS similarity indexing.
-
-
-
-\---
-
-
-
-\## 3. Query Embedding
-
-
-
-The user query is converted into semantic vectors.
-
-
-
-\---
-
-
-
-\## 4. Retrieval
-
-
-
-Top-K relevant chunks are retrieved using cosine similarity.
-
-
-
-\---
-
-
-
-\## 5. Generation
-
-
-
-Retrieved context is injected into the prompt template and passed to Mistral 7B through Ollama.
-
-
-
-\---
-
-
-
-\# 📊 Confidence Scoring
-
-
-
-AetherRAG includes confidence estimation based on semantic similarity between the user query and retrieved document chunks.
-
-
-
-The score is normalized for intuitive readability while preserving retrieval quality.
-
-
-
-\## Confidence Ranges
-
-
-
-| Badge | Range | Meaning |
-
-|---|---|---|
-
-| 🟢 High Confidence | 75% – 100% | Strong semantic relevance |
-
-| 🟡 Medium Confidence | 45% – 74% | Partial contextual relevance |
-
-| 🔴 Low Confidence | Below 45% | Weak retrieval match |
-
-
-
-Confidence scores help users quickly estimate how strongly the retrieved context supports the generated response.
-
-
-
-\---
-
-
-
-\# 📁 Project Structure
-
-
-
-```bash
-
-AetherRAG/
-
-│
-
-├── app.py
-
-├── ingestion.py
-
-├── utils.py
-
-├── requirements.txt
-
-├── Dockerfile
-
-├── docker-compose.yml
-
-│
-
-├── faiss\_index/
-
-│
-
-├── assets/
-
-│   ├── logo.png
-
-│   ├── system\_workflow.png
-
-│   ├── docker\_architecture.png
-
-│   └── offline\_architecture.png
-
-│
-
-└── README.md
-
-```
-
-
-
-\---
-
-
-
-\# 🚀 Installation
-
-
-
-\## 1. Clone Repository
-
-
-
-```bash
-
 git clone https://github.com/Hritshhh/AetherRAG.git
-
 cd AetherRAG
-
 ```
 
+---
 
+# ▶️ Method 1 — Run Normally (Streamlit)
 
-\---
-
-
-
-\# 🖥️ Method 1 — Run Normally (Without Docker)
-
-
-
-\## Install Dependencies
-
-
+## Install Requirements
 
 ```bash
-
 pip install -r requirements.txt
-
 ```
 
+## Install Ollama
 
-
-\---
-
-
-
-\## Install Ollama
-
-
-
-Download from:
-
-
+Download Ollama from:
 
 https://ollama.com
 
+---
 
-
-\---
-
-
-
-\## Pull Mistral Model
-
-
+## Pull Mistral Model
 
 ```bash
-
-ollama pull mistral:7b-instruct-v0.3-q4\_K\_M
-
+ollama pull mistral:7b-instruct-v0.3-q4_K_M
 ```
 
+---
 
-
-\---
-
-
-
-\## Run Streamlit App
-
-
+## Run Application
 
 ```bash
-
 streamlit run app.py
-
 ```
 
+---
 
+# 🐳 Method 2 — Run Using Docker
 
-\---
+## Start Docker Desktop
 
+Ensure Docker Desktop is running.
 
+---
 
-\# 🐳 Method 2 — Run Using Docker (Recommended)
-
-
-
-\## Build \& Start Containers
-
-
+## Build & Start Containers
 
 ```bash
-
-docker-compose up --build
-
+docker compose up --build
 ```
 
+---
 
-
-\---
-
-
-
-\## Pull Mistral Model Inside Container
-
-
+## Pull Mistral Model Inside Container
 
 ```bash
-
-docker exec -it ollama ollama pull mistral:7b-instruct-v0.3-q4\_K\_M
-
+docker exec -it ollama ollama pull mistral:7b-instruct-v0.3-q4_K_M
 ```
 
+---
 
+## Access Application
 
-\---
-
-
-
-\## Access Application
-
-
-
-Open:
-
-
+Open in browser:
 
 ```bash
-
 http://localhost:8501
-
 ```
 
+---
 
-
-\---
-
-
-
-\# 🛑 Stop Containers
-
-
+# 📁 Project Structure
 
 ```bash
-
-docker-compose down
-
+AetherRAG/
+│
+├── app.py
+├── ingestion.py
+├── utils.py
+├── requirements.txt
+├── docker-compose.yml
+├── Dockerfile
+│
+├── faiss_index/
+├── data/
+│
+└── assets/
+    ├── logo.png
+    ├── system_workflow.png
+    ├── docker_architecture.png
+    └── offline_pipeline.png
 ```
 
+---
 
+# 🎯 Key Highlights
 
-\---
+- Fully local RAG assistant
+- Runs without internet
+- Semantic retrieval using FAISS
+- Local Mistral 7B inference
+- Modern chat interface
+- Incremental vector indexing
+- Dockerized deployment
+- Streamed token generation
+- Confidence-aware retrieval
 
+---
 
+# 📚 References
 
-\# 🧹 Clear Stored Embeddings
+- LangChain  
+https://www.langchain.com/
 
+- Ollama  
+https://ollama.com/
 
+- FAISS  
+https://github.com/facebookresearch/faiss
 
-The application includes:
+- Mistral AI  
+https://mistral.ai/
 
-\- Delete Chat
+- BAAI Embeddings  
+https://huggingface.co/BAAI/bge-small-en-v1.5
 
-\- Clear All Data
+---
 
+# 📜 License
 
+This project is intended for academic and educational purposes.
 
-which remove:
+---
 
-\- session chat history
+# ⭐ AetherRAG
 
-\- FAISS embeddings
-
-\- indexed document vectors
-
-
-
-\---
-
-
-
-\# 📌 Future Improvements
-
-
-
-\- OCR support
-
-\- Hybrid retrieval
-
-\- Metadata filtering
-
-\- Multi-user support
-
-\- GPU acceleration
-
-\- Agentic workflows
-
-\- Conversation memory
-
-
-
-\---
-
-
-
-\# 📚 References
-
-
-
-\- LangChain
-
-\- FAISS
-
-\- Ollama
-
-\- Streamlit
-
-\- HuggingFace Embeddings
-
-\- Mistral AI
-
-
-
-Research Areas:
-
-\- Retrieval-Augmented Generation (RAG)
-
-\- Local LLM Inference
-
-\- Semantic Search Systems
-
-\- Vector Database Retrieval
-
-
-
-\---
-
-
-
-\# 👨‍💻 Author
-
-
-
-<p align="center">
-
-&#x20; <b>Hritaansh Mehra</b><br>
-
-&#x20; Engineering Project — AetherRAG<br><br>
-
-&#x20; 
-
-&#x20; 🔗 <a href="https://github.com/Hritshhh">GitHub Profile</a>
-
-</p>
-
-
-
-\# ⭐ Aether
-
-
-
-> “AI that is local, private and truly yours.”
-
+> Private. Offline. Local. Yours.
