@@ -239,7 +239,7 @@ def load_vs():
 def build_chain(vs):
     return RetrievalQA.from_chain_type(
         llm=get_llm(),
-        retriever=vs.as_retriever(search_kwargs={"k": 2}),
+        retriever=vs.as_retriever(search_kwargs={"k": 4}),
         return_source_documents=True,
         chain_type_kwargs={"prompt": RAG_PROMPT},
     )
@@ -459,10 +459,10 @@ if not st.session_state.messages:
     st.markdown("**Upload your documents, then try asking:**")
     cols = st.columns(2)
     for i, s in enumerate([
-        "Summarize this document",
-        "What are the key points?",
-        "Explain this in simple terms",
-        "Who are the main people mentioned?",
+        "Summarize the uploaded document",
+        "What are the key points in this document?",
+        "Explain the document in simple terms",
+        "Who are the main people mentioned in the document?",
     ]):
         with cols[i % 2]:
             if st.button(s, key=f"sug_{s}", use_container_width=True):
@@ -559,11 +559,13 @@ if query:
             st.info("⬅️ Upload a document from the sidebar to get started.")
             st.stop()
 
-        #    similarity_search_with_relevance_scores normalises correctly for L2/cosine
-        #    unlike similarity_search_with_score which returns raw L2 distances
-        docs_with_scores = st.session_state.vectorstore.similarity_search_with_relevance_scores(
-            query, k=5
-        )
+        # similarity_search_with_relevance_scores normalises correctly for L2/cosine
+        # unlike similarity_search_with_score which returns raw L2 distances
+        if len(query.split()) <= 3:
+            k = 5
+        else:
+            k = 3
+        docs_with_scores = st.session_state.vectorstore.similarity_search_with_relevance_scores(query,k=k)
         confidences = [score for _, score in docs_with_scores]
         max_conf    = max(confidences) if confidences else 0.0
 
@@ -579,7 +581,7 @@ if query:
             st.session_state.messages.append({"role": "assistant", "content": answer})
             st.stop()
 
-        # 2. Run chain
+        # Run chain
         handler       = StreamHandler(ai_slot)
         llm           = get_llm()
         llm.callbacks = [handler]
@@ -605,17 +607,25 @@ if query:
                     )
                     seen.add(src)
 
-        pct = round(max_conf * 100, 1)
-        if max_conf >= 0.70:
-            conf_label = f"🟢 {pct}% confident"
-        elif max_conf >= 0.50:
-            conf_label = f"🟡 {pct}% low confidence"
+        def display_conf(score):
+            if score < 0.3:
+                return score * 100 * 0.6
+            elif score < 0.7:
+                return 40 + (score-0.3) * 100
+            else:
+                return 80 + (score - 0.7) * 50
+        pct = round(display_conf(max_conf),1)
+
+        if max_conf >= 0.60:
+            conf_label = f" 🟢{pct}% confidence"
+        elif max_conf >= 0.45:
+            conf_label = f" 🟡{pct}% confidence"
         else:
-            conf_label = f"🔴 {pct}% very low confidence"
+            conf_label = f" 🔴{pct}% confidence"
 
         confidence_text = (
-            f'<div style="font-size:11px;color:#888;margin-top:6px;">'
-            f'{conf_label}</div>'
+            f'<span style="display:block;font-size:11px;color:#888;margin-top:6px;">'
+            f'{conf_label}</span>'
         )
 
         full_answer = answer + source_text + confidence_text
