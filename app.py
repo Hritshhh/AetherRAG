@@ -1,478 +1,562 @@
 import streamlit as st
 import streamlit.components.v1 as components
-import os, shutil, base64, time
-import random
-import gc
-from langchain_community.llms import Ollama
+import os, base64, gc, random, time
+from langchain_ollama import OllamaLLM
 from langchain_community.vectorstores import FAISS
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
-from langchain.callbacks.base import BaseCallbackHandler
-
+from langchain_core.prompts import PromptTemplate
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.output_parsers import StrOutputParser
 from ingestion import get_embeddings, ingest_documents
 from utils import load_documents_from_files
 
-# ── ENV ───────────────────────────────────────────────────────────────────────
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+# ── CONFIG & CONSTANTS ────────────────────────────────────────────────────────
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+CONFIDENCE_THRESHOLD = 0.35
+K_DOC_QUERY = 15
+K_SHORT_QUERY = 5
+K_DEFAULT = 3
 
 st.set_page_config(
     page_title="AetherRAG",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-# LOGO 
-def get_b64(path):
-    if os.path.exists(path):
-        with open(path, "rb") as f:
-            return base64.b64encode(f.read()).decode()
-    return None
 
-LOGO     = get_b64("assets/logo.png")
+# ── LOGO ──────────────────────────────────────────────────────────────────────
+def get_b64(path):
+    if not os.path.exists(path):
+        return None
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+LOGO = get_b64("assets/logo.png")
 LOGO_SRC = f"data:image/png;base64,{LOGO}" if LOGO else ""
-AVATAR   = (
+AVATAR = (
     f'<img class="ai-avatar" src="{LOGO_SRC}">'
     if LOGO_SRC else
     '<div class="ai-avatar-fb"></div>'
 )
 
-# CSS
+# ── CSS ───────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-#MainMenu, footer, header { visibility: hidden; }
-h1 a, h2 a, h3 a { display: none !important; }
+#MainMenu,footer,header{visibility:hidden;}
+h1 a,h2 a,h3 a{display:none!important;}
+.stApp{background:#f5f8ff;}
+section[data-testid="stSidebar"]{
+background:#fff;
+border-right:1px solid #e8edf5;
+}
+[data-testid="collapsedControl"]{
+top:12px!important;
+left:12px!important;
+width:32px;
+height:32px;
+}
+[data-testid="collapsedControl"] svg{
+display:none!important;
+}
+[data-testid="collapsedControl"]::after{
+content:"☰";
+font-size:22px;
+color:#4a5568;
+position:absolute;
+top:2px;
+left:4px;
+}
+textarea,input{
+caret-color:#4a7ab5!important;
+}
+.app-header{
+font-size:42px;
+font-weight:800;
+letter-spacing:-1.5px;
+color:#1a1a2e;
+text-shadow:
+0 0 20px rgba(100,149,237,.5),
+0 0 55px rgba(100,149,237,.22);
+margin-top:-22px;
+margin-bottom:0;
+}
+.chat-wrap{
+padding:4px 0 90px;
+}
+.msg-row{
+display:flex;
+align-items:flex-start;
+margin:3px 0 10px;
+}
+.msg-row.user{justify-content:flex-end;}
+.msg-row.ai{justify-content:flex-start;}
 
-.stApp { background: #f5f8ff; }
-section[data-testid="stSidebar"] {
-    background: #ffffff;
-    border-right: 1px solid #e8edf5;
+.ai-avatar{
+width:30px;
+height:30px;
+border-radius:50%;
+object-fit:cover;
+margin:1px 7px 0 0;
+flex-shrink:0;
 }
-[data-testid="collapsedControl"] {
-    top: 12px !important;
-    left: 12px !important;
-    width: 32px;
-    height: 32px;
+
+.ai-avatar-fb{
+width:30px;
+height:30px;
+border-radius:50%;
+background:linear-gradient(135deg,#6495ed,#87ceeb);
+margin-right:7px;
+flex-shrink:0;
 }
-[data-testid="collapsedControl"] svg {
-    opacity: 0 !important;
-    width: 0 !important;
-    height: 0 !important;
-    display: none !important;
+
+@keyframes ai-glow-pulse{
+0%{box-shadow:0 0 0 rgba(106,169,255,0);}
+40%{box-shadow:0 0 18px rgba(106,169,255,.65);}
+100%{box-shadow:0 0 0 rgba(106,169,255,0);}
 }
-[data-testid="collapsedControl"]::after {
-    content: "☰";
-    font-size: 22px;
-    color: #4a5568;
-    position: absolute;
-    top: 2px;
-    left: 4px;
+
+.fade-out{
+animation:fadeOut .35s ease forwards;
 }
-textarea, input {
-    caret-color: #4a7ab5 !important;
+
+@keyframes fadeOut{
+from{opacity:1;transform:scale(1);}
+to{opacity:0;transform:scale(.98);}
 }
-.app-header {
-    font-size: 42px;
-    font-weight: 800;
-    letter-spacing: -1.5px;
-    color: #1a1a2e;
-    text-shadow:
-        0 0 20px rgba(100,149,237,0.50),
-        0 0 55px rgba(100,149,237,0.22);
-    margin-top: -22px;
-    margin-bottom: 0;
+
+.bubble{
+max-width:60%;
+padding:10px 14px;
+font-size:14.5px;
+line-height:1.65;
+white-space:pre-wrap;
+word-wrap:break-word;
+position:relative;
+box-shadow:0 1px 4px rgba(0,0,0,.08);
+transition:transform .15s;
 }
-.chat-wrap { padding: 4px 0 90px 0; }
-.msg-row {
-    display: flex;
-    align-items: flex-start;
-    margin: 3px 0 10px 0;
+
+.bubble:hover{
+transform:translateY(-2px);
 }
-.msg-row.user { justify-content: flex-end; }
-.msg-row.ai   { justify-content: flex-start; }
-.ai-avatar {
-    width: 30px; height: 30px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-right: 7px;
-    flex-shrink: 0;
-    margin-top: 1px;
+
+.bubble.ai.new{
+animation:ai-glow-pulse .8s ease-out;
 }
-.ai-avatar-fb {
-    width: 30px; height: 30px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #6495ed, #87ceeb);
-    margin-right: 7px;
-    flex-shrink: 0;
+
+.bubble.user{
+background:#e8e8e8;
+color:#1a1a1a;
+border-radius:14px 0 14px 14px;
 }
-@keyframes ai-glow-pulse {
-    0%   { box-shadow: 0 0 0   rgba(106,169,255,0); }
-    40%  { box-shadow: 0 0 18px rgba(106,169,255,0.65); }
-    100% { box-shadow: 0 0 0   rgba(106,169,255,0); }
+
+.bubble.user::after{
+content:"";
+position:absolute;
+top:0;
+right:-8px;
+border-left:8px solid #e8e8e8;
+border-bottom:8px solid transparent;
 }
-.fade-out {
-    animation: fadeOut 0.35s ease forwards;
+
+.bubble.ai{
+background:#d4eeff;
+color:#1a1a1a;
+border-radius:0 14px 14px 14px;
 }
-@keyframes fadeOut {
-    from { opacity: 1; transform: scale(1); }
-    to   { opacity: 0; transform: scale(0.98); }
+
+.bubble.ai::before{
+content:"";
+position:absolute;
+top:0;
+left:-8px;
+border-right:8px solid #d4eeff;
+border-bottom:8px solid transparent;
 }
-.bubble {
-    max-width: 60%;
-    padding: 10px 14px;
-    font-size: 14.5px;
-    line-height: 1.65;
-    word-wrap: break-word;
-    white-space: pre-wrap;
-    position: relative;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-    transition: transform 0.15s ease;
+
+.tdots{
+display:flex;
+gap:5px;
+align-items:center;
+padding:2px 0;
 }
-.bubble:hover { transform: translateY(-2px); }
-.bubble.ai.new { animation: ai-glow-pulse 0.8s ease-out; }
-.bubble.user {
-    background: #e8e8e8;
-    color: #1a1a1a;
-    border-radius: 14px 0 14px 14px;
+
+.tdots span{
+width:7px;
+height:7px;
+border-radius:50%;
+background:#7aaec8;
+animation:tdot 1.2s infinite ease-in-out;
 }
-.bubble.user::after {
-    content: '';
-    position: absolute;
-    top: 0; right: -8px;
-    border-left: 8px solid #e8e8e8;
-    border-bottom: 8px solid transparent;
+
+.tdots span:nth-child(2){animation-delay:.18s;}
+.tdots span:nth-child(3){animation-delay:.36s;}
+
+@keyframes tdot{
+0%,80%,100%{transform:translateY(0);}
+40%{transform:translateY(-6px);}
 }
-.bubble.ai {
-    background: #d4eeff;
-    color: #1a1a1a;
-    border-radius: 0 14px 14px 14px;
+div.stButton>button{
+font-size:12px;
+padding:6px 16px;
+border-radius:20px;
+border:1px solid #c8dff0;
+background:#fff;
+color:#2a5a8a;
+transition:.15s;
+box-shadow:0 1px 4px rgba(100,180,255,.12);
+margin-bottom:4px;
 }
-.bubble.ai::before {
-    content: '';
-    position: absolute;
-    top: 0; left: -8px;
-    border-right: 8px solid #d4eeff;
-    border-bottom: 8px solid transparent;
+
+div.stButton>button:hover{
+background:#e8f4ff;
+border-color:#7ab0d8;
+box-shadow:0 2px 8px rgba(100,180,255,.22);
 }
-.tdots { display:flex; gap:5px; align-items:center; padding:2px 0; }
-.tdots span {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: #7aaec8;
-    animation: tdot 1.2s infinite ease-in-out;
-}
-.tdots span:nth-child(2) { animation-delay: .18s; }
-.tdots span:nth-child(3) { animation-delay: .36s; }
-@keyframes tdot {
-    0%, 80%, 100% { transform: translateY(0); }
-    40%           { transform: translateY(-6px); }
-}
-div.stButton > button {
-    font-size: 12px;
-    padding: 6px 16px;
-    border-radius: 20px;
-    border: 1px solid #c8dff0;
-    background: #ffffff;
-    color: #2a5a8a;
-    transition: all 0.15s;
-    box-shadow: 0 1px 4px rgba(100,180,255,0.12);
-    margin-bottom: 4px;
-}
-div.stButton > button:hover {
-    background: #e8f4ff;
-    border-color: #7ab0d8;
-    box-shadow: 0 2px 8px rgba(100,180,255,0.22);
-}
-section[data-testid="stSidebar"] div.stButton > button {
-    width: 100%;
-    text-align: left;
-    border-radius: 8px;
-    margin-bottom: 6px;
+
+section[data-testid="stSidebar"] div.stButton>button{
+width:100%;
+text-align:left;
+border-radius:8px;
+margin-bottom:6px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# CACHED RESOURCES 
+
+# ── LLM & CACHED RESOURCES ────────────────────────────────────────────────────
 @st.cache_resource(show_spinner=False)
 def get_embeddings_cached():
     return get_embeddings()
 
-@st.cache_resource(show_spinner=False)
-def get_llm():
-    return Ollama(
+
+def get_llm(callbacks=None):
+    return OllamaLLM(
         base_url=OLLAMA_HOST,
         model="mistral:7b-instruct-v0.3-q4_K_M",
-        temperature=0.55,
+        temperature=0.6,
         num_ctx=4096,
         num_predict=700,
+        callbacks=callbacks or []
     )
 
+
 RAG_PROMPT = PromptTemplate(
-    template="""
-You are AetherRAG, a helpful AI assistant.
+    template="""You are AetherRAG, a trustworthy retrieval-augmented AI assistant.
 
-Answer using ONLY the provided context.
+Use the provided context as the primary source of truth.
 
-Guidelines:
-- Provide clear, structured answers
-- If multiple sources disagree, mention both viewpoints
-- Always stay grounded in context
-- Do NOT make up information
+Rules:
+- Never invent information.
+- If context is insufficient, explicitly say so.
+- Combine information across chunks when possible.
+- If documents disagree, explain both viewpoints.
+- Write naturally and clearly.
 
 Context:
 {context}
 
-Question: {question}
+Question:
+{question}
 
 Answer:
 """,
     input_variables=["context", "question"],
 )
 
-def load_vs():
-    if os.path.exists("./faiss_index/index.faiss"):
-        return FAISS.load_local(
-            "./faiss_index",
-            get_embeddings_cached(),
-            allow_dangerous_deserialization=True,
-        )
-    return None
+GENERAL_PROMPT = """You are Aether, a helpful AI assistant.
 
-def build_chain(vs):
-    return RetrievalQA.from_chain_type(
-        llm=get_llm(),
-        retriever=vs.as_retriever(search_kwargs={"k": 4}),
-        return_source_documents=True,
-        chain_type_kwargs={"prompt": RAG_PROMPT},
+Answer naturally using your own knowledge.
+If you are uncertain, say so.
+
+Question:
+{question}
+
+Answer:
+"""
+
+
+def load_vs():
+    if not os.path.exists("./faiss_index/index.faiss"):
+        return None
+    return FAISS.load_local(
+        "./faiss_index",
+        get_embeddings_cached(),
+        allow_dangerous_deserialization=True,
     )
 
-# STREAM HANDLER 
+
+def format_docs(docs):
+    return "\n\n".join(doc.page_content for doc in docs)
+
+
+def build_chain(llm):
+    # Pure LCEL Architecture: Bypasses legacy langchain.chains entirely
+    return (
+            {"context": lambda x: format_docs(x["context"]), "question": lambda x: x["question"]}
+            | RAG_PROMPT
+            | llm
+            | StrOutputParser()
+    )
+
+
+# ── QUERY CLASSIFICATION & RETRIEVAL ──────────────────────────────────────────
+DOCUMENT_INTENTS = {
+    "summarize", "summary", "overview", "tldr", "tl;dr",
+    "key point", "key points", "main point", "main points",
+    "explain the document", "explain this document", "explain this",
+    "simplify", "simple terms", "this document", "the document",
+    "pdf", "file", "context", "who is mentioned", "what is this document about",
+    "what does this document discuss", "document summary", "summarize the document",
+    "summarize this"
+}
+
+
+def is_document_query(query: str) -> bool:
+    q = query.lower()
+    return "document" in q or "pdf" in q or any(x in q for x in DOCUMENT_INTENTS)
+
+def retrieve_documents(vs, query: str):
+    doc_query = is_document_query(query)
+    k = K_DOC_QUERY if doc_query else (K_SHORT_QUERY if len(query.split()) <= 3 else K_DEFAULT)
+    docs_with_scores = vs.similarity_search_with_relevance_scores(query, k=k)
+    max_conf = max((s for _, s in docs_with_scores), default=0.0)
+    return docs_with_scores, max_conf, doc_query
+
+def run_general_llm(query: str, llm):
+    return llm.invoke(GENERAL_PROMPT.format(question=query)).strip()
+
+
+def get_confidence_badge(conf_float):
+    pct = int(conf_float * 100)
+    if pct >= 60:
+        color = "#28a745"  # green
+    elif pct >= 35:
+        color = "#e5a800"  # yellow
+    else:
+        color = "#dc3545"  # red
+    return f"<span style='color:{color}; font-weight:600;'>{pct}%</span>"
+
+
+# ── STREAM HANDLER ────────────────────────────────────────────────────────────
 class StreamHandler(BaseCallbackHandler):
     def __init__(self, placeholder):
-        self.placeholder  = placeholder
-        self.text         = ""
-        self._last_render = 0.0
+        self.placeholder = placeholder
+        self.text = ""
+        self.last_render = 0
 
-    def _render(self, cursor=True):
-        c    = '<span style="color:#8aaec8;font-weight:300;">|</span>' if cursor else ""
-        html = (
-            f'<div class="msg-row ai">{AVATAR}'
-            f'<div class="bubble ai">{self.text}{c}</div></div>'
+    def render(self, cursor=True):
+        cur = '<span style="color:#8aaec8;font-weight:300;">|</span>' if cursor else ""
+        self.placeholder.markdown(
+            f'<div class="msg-row ai">{AVATAR}<div class="bubble ai">{self.text}{cur}</div></div>',
+            unsafe_allow_html=True,
         )
-        self.placeholder.markdown(html, unsafe_allow_html=True)
 
-    def on_llm_new_token(self, token: str, **kwargs):
+    def on_llm_new_token(self, token, **kwargs):
         self.text += token
         now = time.time()
-        if now - self._last_render > 0.02:
-            self._render(cursor=True)
-            self._last_render = now
+        if now - self.last_render > 0.02:
+            self.render()
+            self.last_render = now
 
     def on_llm_end(self, *args, **kwargs):
-        html = (
-            f'<div class="msg-row ai">{AVATAR}'
-            f'<div class="bubble ai new">{self.text}</div></div>'
+        self.placeholder.markdown(
+            f'<div class="msg-row ai">{AVATAR}<div class="bubble ai new">{self.text}</div></div>',
+            unsafe_allow_html=True,
         )
-        self.placeholder.markdown(html, unsafe_allow_html=True)
 
-# SESSION STATE 
-if "messages"        not in st.session_state: st.session_state.messages        = []
-if "vectorstore"     not in st.session_state: st.session_state.vectorstore     = load_vs()
-if "ingested_files"  not in st.session_state: st.session_state.ingested_files  = set()
-if "pending_query"   not in st.session_state: st.session_state.pending_query   = None
-if "confirm_delete"  not in st.session_state: st.session_state.confirm_delete  = False
-if "fade_delete"     not in st.session_state: st.session_state.fade_delete     = False
-# uploader_key is incremented to force a fresh file_uploader widget on clear
-# (Streamlit forbids setting a file_uploader value via session_state directly)
-if "uploader_key"    not in st.session_state: st.session_state.uploader_key    = 0
 
-# DEFERRED CLEAR DATA 
+# ── SESSION STATE ─────────────────────────────────────────────────────────────
+defaults = {
+    "messages": [],
+    "vectorstore": load_vs(),
+    "ingested_files": set(),
+    "pending_query": None,
+    "confirm_delete": False,
+    "fade_delete": False,
+    "uploader_key": 0,
+}
+
+for k, v in defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+# ── CLEAR DATA ────────────────────────────────────────────────────────────────
 if st.session_state.fade_delete:
-    time.sleep(0.3)
-
-    # 1. Release FAISS
+    time.sleep(.3)
     st.session_state.vectorstore = None
     gc.collect()
-
-    # 2. Delete FILES INSIDE, not folder
-    index_path = "./faiss_index"
-
-    if os.path.exists(index_path):
-        for filename in os.listdir(index_path):
-            file_path = os.path.join(index_path, filename)
+    index = "./faiss_index"
+    if os.path.exists(index):
+        for f in os.listdir(index):
+            p = os.path.join(index, f)
             try:
-                if os.path.isfile(file_path):
-                    os.remove(file_path)
-            except Exception as e:
-                print(f"⚠️ Could not delete {file_path}: {e}")
-
-    # 3. Reset state
-    st.session_state.messages       = []
-    st.session_state.pending_query  = None
+                if os.path.isfile(p):
+                    os.remove(p)
+            except Exception:
+                pass
+    st.session_state.messages = []
     st.session_state.ingested_files = set()
-    st.session_state.uploader_key  += 1
-    st.session_state.fade_delete    = False
+    st.session_state.pending_query = None
     st.session_state.confirm_delete = False
-
+    st.session_state.fade_delete = False
+    st.session_state.uploader_key += 1
     st.rerun()
 
-# HEADER 
+# ── HEADER & TAGLINE ──────────────────────────────────────────────────────────
 st.markdown('<div class="app-header">AetherRAG</div>', unsafe_allow_html=True)
-
-# TAGLINE 
 components.html("""
 <style>
-  * { margin:0; padding:0; }
-  body { background:transparent;
-         font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
-  .tl { font-size:13.5px; color:#888; user-select:none; }
-  #tw { color:#4a7ab5; font-weight:500; }
-  .cur {
-    display:inline-block; width:1.5px; height:12px;
-    background:#4a7ab5; vertical-align:middle; margin-left:1px;
-    animation: bl 0.85s step-end infinite;
-  }
-  @keyframes bl { 0%,100%{opacity:1} 50%{opacity:0} }
+*{margin:0;padding:0}
+body{
+background:transparent;
+font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+.tl{
+font-size:13.5px;
+color:#888;
+user-select:none;
+}
+#tw{
+color:#4a7ab5;
+font-weight:500;
+}
+.cur{
+display:inline-block;
+width:1.5px;
+height:12px;
+background:#4a7ab5;
+vertical-align:middle;
+margin-left:1px;
+animation:bl .85s step-end infinite;
+}
+@keyframes bl{
+0%,100%{opacity:1}
+50%{opacity:0}
+}
 </style>
 <div class="tl">AI that is <span id="tw"></span><span class="cur" id="cur"></span></div>
 <script>
-(function(){
-  const words = ['private','local','free','secure','yours'];
-  const el    = document.getElementById('tw');
-  const cur   = document.getElementById('cur');
-  let wi=0, ci=0, del=false;
-
-  if(sessionStorage.getItem('aether_td')){
-    el.textContent = 'yours.';
-    cur.style.display = 'none';
+(()=>{
+const words=["private","local","free","secure","yours"];
+const tw=document.getElementById("tw");
+const cur=document.getElementById("cur");
+let wi=0;
+let ci=0;
+let deleting=false;
+if(sessionStorage.getItem("aether_tagline")){
+    tw.textContent="yours.";
+    cur.style.display="none";
     return;
-  }
-  function tick(){
-    const w = words[wi];
-    if(!del){
-      el.textContent = w.slice(0, ++ci);
-      if(ci === w.length){
-        if(wi === words.length - 1){
-          setTimeout(()=>{
-            cur.style.animation = 'none';
-            cur.style.opacity   = '0';
-            el.textContent      = 'yours.';
-            sessionStorage.setItem('aether_td','1');
-          }, 2000);
-          return;
+}
+function tick(){
+    const w=words[wi];
+    if(!deleting){
+        tw.textContent=w.slice(0,++ci);
+        if(ci===w.length){
+            if(wi===words.length-1){
+                setTimeout(()=>{
+                    tw.textContent="yours.";
+                    cur.style.display="none";
+                    sessionStorage.setItem("aether_tagline","1");
+                },1800);
+                return;
+            }
+            return setTimeout(()=>{
+                deleting=true;
+                tick();
+            },700);
         }
-        return setTimeout(()=>{ del=true; tick(); }, 750);
-      }
-    } else {
-      el.textContent = w.slice(0, --ci);
-      if(ci === 0){ del=false; wi++; }
+    }else{
+        tw.textContent=w.slice(0,--ci);
+        if(ci===0){
+            deleting=false;
+            wi++;
+        }
     }
-    setTimeout(tick, del ? 48 : 78);
-  }
-  tick();
+    setTimeout(tick,deleting?45:75);
+}
+tick();
 })();
 </script>
 """, height=24, scrolling=False)
 
-# SIDEBAR 
+# ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     if LOGO:
         st.image("assets/logo.png", width=54)
     st.markdown("### Aether")
     st.caption("Local · Private · Offline")
     st.divider()
-
     st.markdown("**Upload documents**")
-    # key uses uploader_key counter — incrementing it remounts the widget
-    # with no files, which is the only safe way to "reset" a file_uploader
     files = st.file_uploader(
-        " ",
+        "",
         accept_multiple_files=True,
         label_visibility="collapsed",
-        key=f"file_uploader_{st.session_state.uploader_key}",
+        key=f"upload_{st.session_state.uploader_key}",
     )
-
     if files:
-        new_files = set(f.name for f in files) - st.session_state.ingested_files
-
+        new_files = {f.name for f in files} - st.session_state.ingested_files
         if new_files:
-            with st.spinner("Ingesting…"):
+            with st.spinner("Ingesting documents..."):
                 docs = []
-
                 for f in files:
                     if f.name in new_files:
                         docs.extend(load_documents_from_files([f]))
-
                 if docs:
-                    ingest_documents(docs)   # append, NOT rebuild
-
-                    st.session_state.vectorstore = None 
+                    ingest_documents(docs)
+                    st.session_state.vectorstore = None
                     st.session_state.ingested_files.update(new_files)
-
-            st.success(f"✓ Added {len(new_files)} new file(s)")
-
+            st.success(f"Added {len(new_files)} file(s).")
     st.divider()
-
-    if st.button("🗑  Delete chat", use_container_width=True):
+    if st.button("🗑 Delete Chat", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
-
-    if st.button("🗑  Clear all data", use_container_width=True):
+    if st.button("🗑 Clear All Data", use_container_width=True):
         st.session_state.confirm_delete = True
-
     if st.session_state.confirm_delete:
-        st.warning("⚠️ This will delete all uploaded data and embeddings.")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Yes, delete", use_container_width=True):
-                st.session_state.fade_delete   = True
+        st.warning("This will permanently remove uploaded documents and embeddings.")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("Delete", use_container_width=True):
                 st.session_state.confirm_delete = False
+                st.session_state.fade_delete = True
                 st.rerun()
-        with col2:
+        with c2:
             if st.button("Cancel", use_container_width=True):
                 st.session_state.confirm_delete = False
                 st.rerun()
 
-    st.divider()
 
-# BUBBLE HELPERS 
+# ── CHAT HELPERS ──────────────────────────────────────────────────────────────
 def user_bubble(text):
-    return (
-        f'<div class="msg-row user">'
-        f'<div class="bubble user">{text}</div>'
-        f'</div>'
-    )
+    return f'<div class="msg-row user"><div class="bubble user">{text}</div></div>'
 
-def ai_bubble(text, thinking=False, is_new=False):
-    body = (
-        '<div class="tdots"><span></span><span></span><span></span></div>'
-        if thinking else text
-    )
-    cls = "bubble ai" + (" new" if is_new else "")
-    return (
-        f'<div class="msg-row ai">'
-        f'{AVATAR}'
-        f'<div class="{cls}">{body}</div>'
-        f'</div>'
-    )
 
-# ONBOARDING 
+def ai_bubble(text="", thinking=False, new=False):
+    body = '<div class="tdots"><span></span><span></span><span></span></div>' if thinking else text
+    cls = "bubble ai new" if new else "bubble ai"
+    return f'<div class="msg-row ai">{AVATAR}<div class="{cls}">{body}</div></div>'
+
+
+# ── ONBOARDING ────────────────────────────────────────────────────────────────
 if not st.session_state.messages:
     st.markdown("**Upload your documents, then try asking:**")
-    cols = st.columns(2)
-    for i, s in enumerate([
+    suggestions = [
         "Summarize the uploaded document",
         "What are the key points in this document?",
         "Explain the document in simple terms",
         "Who are the main people mentioned in the document?",
-    ]):
-        with cols[i % 2]:
-            if st.button(s, key=f"sug_{s}", use_container_width=True):
+    ]
+    c1, c2 = st.columns(2)
+    for i, s in enumerate(suggestions):
+        with (c1 if i % 2 == 0 else c2):
+            if st.button(s, key=f"suggest_{i}", use_container_width=True):
                 st.session_state.messages.append({"role": "user", "content": s})
                 st.session_state.pending_query = s
                 st.rerun()
 
-# CHAT HISTORY 
-fade_class = "fade-out" if st.session_state.fade_delete else ""
-st.markdown(f'<div class="chat-wrap {fade_class}">', unsafe_allow_html=True)
+# ── CHAT HISTORY ──────────────────────────────────────────────────────────────
+fade = " fade-out" if st.session_state.fade_delete else ""
+st.markdown(f'<div class="chat-wrap{fade}">', unsafe_allow_html=True)
 for m in st.session_state.messages:
     if m["role"] == "user":
         st.markdown(user_bubble(m["content"]), unsafe_allow_html=True)
@@ -480,159 +564,126 @@ for m in st.session_state.messages:
         st.markdown(ai_bubble(m["content"]), unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
-# INPUT + INFERENCE 
-query = st.chat_input("Ask something…")
-
-if query:
-    st.session_state.messages.append({"role": "user", "content": query})
-    st.session_state.pending_query = query
+# ── CHAT INPUT ────────────────────────────────────────────────────────────────
+prompt = st.chat_input("Ask something...")
+if prompt:
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    st.session_state.pending_query = prompt
     st.rerun()
 
-query = st.session_state.get("pending_query")
+query = st.session_state.pending_query
+if not query:
+    st.stop()
+st.session_state.pending_query = None
 
-if query:
-    if not isinstance(query, str) or not query.strip():
-        st.session_state.pending_query = None
-        st.stop()
+# ── GREETING & ACKNOWLEDGEMENT HANDLERS ───────────────────────────────────────
+clean_query = query.lower().replace(",", "").replace(".", "").replace("?", "").replace("!", "")
+words = clean_query.split()
 
-    st.session_state.pending_query = None
+greetings = {"hi", "hello", "hey", "heya", "hiya", "yo", "hola", "greetings", "sup", "howdy"}
+if len(words) <= 2 and any(w in greetings for w in words):
+    reply = random.choice([
+        "Hey! How can I help you today?",
+        "Hello! What would you like to know?",
+        "Hi there! Ready when you are.",
+        "Hey! Ask me anything.",
+        "Hello 👋",
+    ])
+    st.session_state.messages.append({"role": "assistant", "content": reply})
+    st.rerun()
 
-    # ── CONTEXT-AWARE GREETING HANDLER ──
-    greetings = ["hi", "hello", "hey", "yo", "hola", "heya"]
-    q = query.lower().strip()
-    q_clean = q.replace(",", "").replace(".", "").replace("!", "").replace("?", "")
-    tokens = q_clean.split()
-    # Detect greeting intent only if it appears at the START
-    if tokens and tokens[0] in greetings:
-        replies = [
-            "Hey there! Ready to begin?",
-            "Hey! How are you today?",
-            "Hey there, nice to see you.",
-            "Hey there — how can I help you today?",
-            "Hey! What's on your mind?",
-            "Greetings! How can I assist you today?",
-            "Hey! What's up?",
-            "Hey! How's it going?",
-            "Hey! I am Aether, your personal RAG assistant. How can I help you today?",
-            "Hey there! Aether here — how can I help today?",
-        ]
+acks = {"ok", "okay", "alright", "fine", "cool", "thanks", "thank", "thankyou", "thx", "gotcha", "understood"}
+if len(words) <= 2 and any(w in acks for w in words):
+    reply = random.choice([
+        "You're welcome!",
+        "Glad I could help.",
+        "Anytime.",
+        "Happy to help.",
+        "What would you like to ask next?",
+    ])
+    st.session_state.messages.append({"role": "assistant", "content": reply})
+    st.rerun()
 
-        # Only greeting → respond & stop
-        if len(tokens) == 1:
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": random.choice(replies)
-            })
-            st.rerun()
-        # Greeting + actual question → respond AND continue to RAG
-        else:
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": random.choice(replies)
-            })
-        # DO NOT rerun → allow RAG to continue
+# ── PREPARE HYBRID RAG ────────────────────────────────────────────────────────
+if st.session_state.vectorstore is None:
+    st.session_state.vectorstore = load_vs()
 
-        # ── ACKNOWLEDGEMENT HANDLER ──
-    acks = ["ok", "okay", "hmm", "alright", "fine", "cool"]
-    q = query.lower().strip().replace(",", "").replace(".", "")
-    if len(q.split()) <= 2 and any(word in acks for word in q.split()):
-        replies = [
-            "Got it. What else would you like to know?",
-            "Alright 👍 What should we explore next?",
-            "Cool. Want me to explain something else?",
-            "Okay — go ahead, ask your next question.",
-            "Hmm noted. What’s next?",
-        ]
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": random.choice(replies)
-        })
-        st.rerun()
+ai_placeholder = st.empty()
+ai_placeholder.markdown(ai_bubble(thinking=True), unsafe_allow_html=True)
 
-    # RAG HANDLER 
-    elif True:
+handler = StreamHandler(ai_placeholder)
+llm = get_llm(callbacks=[handler])
 
-        if st.session_state.vectorstore is None:
-            st.session_state.vectorstore = load_vs()
+# ── NO DOCUMENTS → GENERAL LLM ────────────────────────────────────────────────
+if not st.session_state.vectorstore:
+    answer = run_general_llm(query, llm)
+    answer += (
+        "<br><span style='font-size:11px;color:#888;'>"
+        "Answered using general knowledge because no documents are uploaded."
+        "</span>"
+    )
+    ai_placeholder.markdown(ai_bubble(answer, new=True), unsafe_allow_html=True)
+    st.session_state.messages.append({"role": "assistant", "content": answer})
+    st.rerun()
 
-        if not st.session_state.vectorstore:
-            st.info("⬅️ Upload a document from the sidebar to get started.")
-            st.stop()
+# ── RETRIEVAL & CONFIDENCE CHECK ──────────────────────────────────────────────
+docs_with_scores, max_conf, is_doc_query = retrieve_documents(st.session_state.vectorstore, query)
 
-        # similarity_search_with_relevance_scores normalises correctly for L2/cosine
-        # unlike similarity_search_with_score which returns raw L2 distances
-        if len(query.split()) <= 3:
-            k = 5
-        else:
-            k = 3
-        docs_with_scores = st.session_state.vectorstore.similarity_search_with_relevance_scores(query,k=k)
-        confidences = [score for _, score in docs_with_scores]
-        max_conf    = max(confidences) if confidences else 0.0
+# ── LOW CONFIDENCE → GENERAL LLM ──────────────────────────────────────────────
+if not is_doc_query and max_conf < CONFIDENCE_THRESHOLD:
+    answer = run_general_llm(query, llm)
 
-        ai_slot = st.empty()
-        ai_slot.markdown(ai_bubble("", thinking=True), unsafe_allow_html=True)
-
-        if max_conf < 0.35:
-            answer = (
-                "I couldn't find relevant information in the uploaded documents. "
-                "Please try asking something else or upload more documents."
-            )
-            ai_slot.markdown(ai_bubble(answer, is_new=True), unsafe_allow_html=True)
-            st.session_state.messages.append({"role": "assistant", "content": answer})
-            st.stop()
-
-        # Run chain
-        handler       = StreamHandler(ai_slot)
-        llm           = get_llm()
-        llm.callbacks = [handler]
-
-        chain  = build_chain(st.session_state.vectorstore)
-        result = chain.invoke({"query": query})
-
-        answer = handler.text or result.get("result", "")
-
-        sources     = result.get("source_documents", [])
-        source_text = ""
-        if sources:
-            seen = set()
-            for doc in sources:
-                src       = doc.metadata.get("source", "Unknown")
-                highlight = (doc.page_content or "").strip().replace("\n", " ")[:200]
-                if src not in seen:
-                    source_text += (
-                        f'<div style="margin-top:8px;font-size:12px;color:#555;">'
-                        f'📄 <b>{src}</b><br>'
-                        f'<span style="background:#fff3b0;padding:2px 5px;border-radius:4px;">'
-                        f'{highlight}…</span></div>'
-                    )
-                    seen.add(src)
-
-        def display_conf(score):
-            if score < 0.3:
-                return score * 100 * 0.6
-            elif score < 0.7:
-                return 40 + (score-0.3) * 100
-            else:
-                return 80 + (score - 0.7) * 50
-        pct = round(display_conf(max_conf),1)
-
-        if max_conf >= 0.60:
-            conf_label = f" 🟢{pct}% confidence"
-        elif max_conf >= 0.45:
-            conf_label = f" 🟡{pct}% confidence"
-        else:
-            conf_label = f" 🔴{pct}% confidence"
-
-        confidence_text = (
-            f'<span style="display:block;font-size:11px;color:#888;margin-top:6px;">'
-            f'{conf_label}</span>'
+    # Hide the confidence footer for purely conversational/short queries to avoid confusion
+    if len(words) > 3:
+        badge = get_confidence_badge(max_conf)
+        answer += (
+            f"<br><span style='font-size:11px;color:#888;'>"
+            f"Answered using general knowledge (Retrieval confidence: {badge})."
+            f"</span>"
         )
 
-        full_answer = answer + source_text + confidence_text
+    ai_placeholder.markdown(ai_bubble(answer, new=True), unsafe_allow_html=True)
+    st.session_state.messages.append({"role": "assistant", "content": answer})
+    st.rerun()
 
-        # 5. Final render + persist
-        ai_slot.markdown(ai_bubble(full_answer, is_new=True), unsafe_allow_html=True)
-        st.session_state.messages.append({"role": "assistant", "content": full_answer})
+# ── HIGH CONFIDENCE OR DOCUMENT QUERY → RAG ───────────────────────────────────
+docs = [doc for doc, score in docs_with_scores]
+chain = build_chain(llm)
 
-    else:
-        st.info("⬅️ Upload a document from the sidebar to get started.")
+# Execute LCEL chain
+answer = chain.invoke({
+    "context": docs,
+    "question": query
+}).strip()
+
+if not answer:
+    answer = "I couldn't generate a response from the uploaded documents."
+
+badge = get_confidence_badge(max_conf)
+answer += f"<br><span style='font-size:11px;color:#888;'>Answered using document context (Confidence: {badge}).</span>"
+
+ai_placeholder.markdown(ai_bubble(answer, new=True), unsafe_allow_html=True)
+st.session_state.messages.append({"role": "assistant", "content": answer})
+
+# ── SOURCES ───────────────────────────────────────────────────────────────────
+if docs_with_scores:
+    with st.expander("📚 Sources", expanded=False):
+        for i, (doc, score) in enumerate(docs_with_scores, 1):
+            src = os.path.basename(doc.metadata.get("source", "Unknown"))
+            page = doc.metadata.get("page")
+
+            title = f"**{i}. {src}"
+            if page is not None:
+                title += f" (Page {page + 1})"
+            title += f" — Relevance: {int(score * 100)}%**"
+
+            st.markdown(title)
+
+            preview = doc.page_content.strip()
+            if len(preview) > 600:
+                preview = preview[:600] + "..."
+
+            # Use blockquote for highlighted snippet appearance
+            st.markdown(f"> {preview}")
+
+st.rerun()
