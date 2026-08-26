@@ -376,11 +376,4 @@ This project is intended for academic and educational purposes.
 
 # Author
 
-### Hritaansh Mehra  
-GitHub: [Hritshhh](https://github.com/Hritshhh)
-
----
-
-# AetherRAG
-
-> Private. Offline. Local. Yours.
+### [Hritaansh Mehra](https://github.com/Hritshhh)
